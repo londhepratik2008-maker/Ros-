@@ -1,9 +1,9 @@
-# justFE — Rosee
+# Rosee
 
-> A reactive AI assistant running entirely in your browser with a rose nebula background.
+> A browser-native AI assistant with a 3D rose nebula, glassmorphism UI, and voice I/O.
 
 ![React](https://img.shields.io/badge/React-19-61DAFB?style=flat&logo=react)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178C6?style=flat&logo=typescript)
+![TypeScript](https://img.shields.io/badge/TypeScript-6.0-3178C6?style=flat&logo=typescript)
 ![Vite](https://img.shields.io/badge/Vite-8-646CFF?style=flat&logo=vite)
 ![WebGPU](https://img.shields.io/badge/WebGPU-Enabled-00A3E0?style=flat)
 
@@ -11,16 +11,35 @@
 
 ## What is this?
 
-Rosee is a fully local AI assistant that runs **Qwen 2.5 7B** in your browser using WebGPU. No servers, no API keys, no data sent anywhere. The UI features a **3D rose nebula** built with Three.js that reacts to audio input — it pulses with your voice, glows with bass, and ripples with treble.
+Rosee is a fully local AI assistant that runs **Qwen 2.5 7B** in your browser using WebGPU. No servers, no API keys, no data sent anywhere. The UI features a **3D rose nebula** built with Three.js that reacts to audio input and can shatter/reassemble on command.
 
 ## Features
 
 ### AI Chat
 - **In-browser inference** via [WebLLM](https://github.com/mlc-ai/web-llm) — models run entirely on your GPU
+- **Works without model loaded** — type messages and they're stored in sessions
 - **Streaming responses** with real-time token generation
 - **Markdown rendering** with syntax highlighting for 100+ languages
 - **Code blocks** with one-click copy
 - **File uploads** — attach images, text files, PDFs via drag & drop
+- **Demo conversation** on first load
+
+### Slash Commands
+Type `/` in the chat input to access commands:
+
+| Command | Description |
+|---------|-------------|
+| `/new` | Start a new chat session |
+| `/sessions` | List all chat sessions |
+| `/switch <id>` | Switch to a session by ID or name |
+| `/delete <id>` | Delete a session |
+| `/commands` | Show all available commands |
+
+### Special Commands
+| Command | Effect |
+|---------|--------|
+| `log off` | Nebula shatters — 15,000 particles explode outward over 3 seconds |
+| `log in` | Nebula reassembles — particles fly back to original positions |
 
 ### Rose Nebula Background
 - **15,000 particles** forming a living rose-shaped nebula
@@ -31,10 +50,16 @@ Rosee is a fully local AI assistant that runs **Qwen 2.5 7B** in your browser us
   - Mid → petal curl, saturation boost, turbulence
   - Treble → halo warping, star twinkling, ring pulsing
   - Volume → overall brightness and size
-- **Smooth interpolation** to prevent jitter
+- **Shatter effect** — particles fly outward with spin and fade
+- **Assemble effect** — particles return with proper per-section coloring (petals=pink, core=orange, halo=purple, stars=blue)
+
+### Glassmorphism UI
+- **Glass pill input** — glossy rounded input with reflective highlight
+- **Glass panel** — right-side chat panel with frosted glass effect
+- **Minimal header** — branding + mic/audio toggles
 
 ### Voice I/O
-- **Speech-to-text** via Web Speech API — dictate messages
+- **Speech-to-text** via Web Speech API — dictate messages (works without model)
 - **Text-to-speech** — assistant responses can be spoken aloud
 
 ### Themes
@@ -44,17 +69,10 @@ Rosee is a fully local AI assistant that runs **Qwen 2.5 7B** in your browser us
 | **Matrix** | Green `#00ff41` | Dark green `#0a0f0a` |
 | **Fire** | Orange `#ff6b35` | Dark red `#1a0a0a` |
 
-### Monitor Dashboard
-- Token speed gauge (tok/s)
-- Latency gauge (ms)
-- GPU adapter info
-- Session message count
-- Model status and progress
-
 ### Persistence
 - Chat sessions saved to `localStorage`
 - Theme choice remembered
-- Sidebar state preserved
+- Demo session auto-loaded on first visit
 
 ---
 
@@ -97,10 +115,11 @@ npm run dev
 Open `http://localhost:5173` in Chrome or Edge.
 
 ### First Launch
-1. Click **Load Model** in the sidebar
-2. Wait for Qwen 2.5 7B to download (~4.5GB, cached after first load)
-3. Start chatting!
-4. Click **NEBULA** in the header to enable audio-reactive mode
+1. The app loads with a demo conversation
+2. Click **Load Model** or type `/commands` to explore
+3. Wait for Qwen 2.5 7B to download (~4.5GB, cached after first load)
+4. Start chatting!
+5. Try `log off` and `log in` to see the nebula effects
 
 ---
 
@@ -113,22 +132,21 @@ src/
 │   ├── models.ts          # Available model configs
 │   └── types.ts           # TypeScript interfaces
 ├── store/
-│   ├── chatStore.ts       # Chat sessions, messages, persistence
+│   ├── chatStore.ts       # Chat sessions, messages, persistence + demo data
 │   ├── modelStore.ts      # Model status, GPU info, metrics
-│   └── uiStore.ts         # Sidebar, theme, active panel
+│   └── uiStore.ts         # Theme, active panel, shatter/assemble state
 ├── components/
 │   ├── core/
-│   │   ├── RoseNebula.tsx # 3D nebula background with audio reactivity
+│   │   ├── RoseNebula.tsx # 3D nebula + shatter/assemble animations
 │   │   ├── AICore.tsx     # Animated AI core visualization
 │   │   └── AgentVisualization.tsx # Thinking process display
 │   ├── chat/
 │   │   ├── ChatPanel.tsx  # Message list with markdown rendering
-│   │   ├── ChatInput.tsx  # Input with file upload, voice, send
+│   │   ├── ChatInput.tsx  # Glass pill input + slash commands + log off/in
 │   │   └── MarkdownRenderer.tsx # Markdown + code highlighting
 │   ├── layout/
-│   │   ├── MainLayout.tsx # App shell
-│   │   ├── Sidebar.tsx    # Sessions, model status, nav
-│   │   ├── Header.tsx     # GPU info, metrics, audio toggle
+│   │   ├── MainLayout.tsx # App shell (no sidebar)
+│   │   ├── Header.tsx     # Minimal header — branding + mic/audio
 │   │   └── SettingsPanel.tsx # Theme switcher, about
 │   ├── monitor/
 │   │   └── MonitorPanel.tsx # Dashboard gauges and stats
@@ -154,16 +172,16 @@ src/
 │   └── storage.ts         # localStorage wrapper
 ├── styles/
 │   └── themes.css         # Theme CSS variables
-├── App.tsx                # Root component
+├── App.tsx                # Root — glass panel layout
 ├── main.tsx               # Entry point
-└── index.css              # Tailwind + animations + themes
+└── index.css              # Tailwind + glass pill/panel CSS + animations
 ```
 
 ---
 
 ## Audio Reactivity
 
-When you click **NEBULA** in the header, Rosee requests microphone access and analyzes audio frequencies in real-time:
+When you click the mic icon, Rosee requests microphone access and analyzes audio frequencies in real-time:
 
 ```
 Microphone → AudioContext → AnalyserNode → FFT → Particle Parameters

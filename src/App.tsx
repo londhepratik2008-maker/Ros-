@@ -1,5 +1,4 @@
 import { useEffect } from 'react'
-import { MainLayout } from './components/layout/MainLayout'
 import { ChatPanel } from './components/chat/ChatPanel'
 import { ChatInput } from './components/chat/ChatInput'
 import { AgentVisualization } from './components/core/AgentVisualization'
@@ -21,18 +20,15 @@ function App() {
   const { activePanel, theme } = useUIStore()
   const { isActive, audioData, toggle } = useAudioAnalyzer()
 
-  // Expose audio toggle globally
   useEffect(() => {
     audioAnalyzer.isActive = isActive
     audioAnalyzer.toggle = toggle
   }, [isActive, toggle])
 
-  // Apply theme to document
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
   }, [theme])
 
-  // Detect WebGPU on mount
   useEffect(() => {
     detectWebGPU().then(info => {
       setGPU({ available: info.available, name: info.name })
@@ -43,24 +39,38 @@ function App() {
   }, [setGPU, setModelStatus])
 
   return (
-    <>
+    <div className="fixed inset-0 z-10 flex h-screen w-screen overflow-hidden">
+      {/* Background */}
       <RoseNebula audioData={isActive ? audioData : undefined} />
-      <MainLayout>
-        {activePanel === 'monitor' ? (
-          <MonitorPanel />
-        ) : activePanel === 'settings' ? (
-          <SettingsPanel />
-        ) : (
-          <div className="h-full flex flex-col">
+
+      {/* Left side — empty, background visible */}
+      <div className="flex-1" />
+
+      {/* Right side — glass chat panel */}
+      {activePanel === 'monitor' ? (
+        <div className="w-[420px] h-full p-4 pl-0">
+          <div className="glass-panel h-full flex flex-col overflow-hidden">
+            <MonitorPanel />
+          </div>
+        </div>
+      ) : activePanel === 'settings' ? (
+        <div className="w-[420px] h-full p-4 pl-0">
+          <div className="glass-panel h-full flex flex-col overflow-hidden">
+            <SettingsPanel />
+          </div>
+        </div>
+      ) : (
+        <div className="w-[420px] h-full p-4 pl-0">
+          <div className="glass-panel h-full flex flex-col overflow-hidden">
             <div className="flex-1 overflow-hidden">
               <ChatPanel />
             </div>
             <AgentVisualization />
             <ChatInput />
           </div>
-        )}
-      </MainLayout>
-    </>
+        </div>
+      )}
+    </div>
   )
 }
 

@@ -1,4 +1,3 @@
-import { Sidebar } from './Sidebar'
 import { Header } from './Header'
 import type { ReactNode } from 'react'
 
@@ -9,7 +8,6 @@ interface MainLayoutProps {
 export function MainLayout({ children }: MainLayoutProps) {
   return (
     <div className="fixed inset-0 z-10 flex h-screen w-screen overflow-hidden">
-      <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
         <Header />
         <main className="flex-1 overflow-hidden">

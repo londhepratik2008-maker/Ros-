@@ -13,7 +13,6 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
   return (
     <ReactMarkdown
       remarkPlugins={[remarkGfm]}
-      className="prose-hud"
       components={{
         code(props) {
           const { children, className, ...rest } = props

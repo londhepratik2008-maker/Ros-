@@ -1,13 +1,6 @@
-import type { ChatCompletionMessageParam, CreateMLCEngineConfig } from '@mlc-ai/web-llm'
+import type { ChatCompletionMessageParam } from '@mlc-ai/web-llm'
 
-type EngineInstance = Awaited<ReturnType<typeof createEngine>> | null
-
-let engineInstance: EngineInstance = null
-
-async function createEngine() {
-  const { CreateMLCEngine } = await import('@mlc-ai/web-llm')
-  return CreateMLCEngine
-}
+let engineInstance: any = null
 
 export interface EngineCallbacks {
   onProgress?: (progress: number, text?: string) => void
@@ -26,15 +19,11 @@ export async function loadModel(
   callbacks?.onProgress(0, 'Initializing WebGPU...')
 
   try {
-    const CreateMLCEngine = await createEngine()
+    const webllm = await import('@mlc-ai/web-llm')
+    const CreateMLCEngine: any = (webllm as any).CreateMLCEngine
 
-    const config: CreateMLCEngineConfig = {
-      model: modelId,
-      log_level: 'WARN',
-    }
-
-    engineInstance = await CreateMLCEngine(config, {
-      initProgressCallback: (report: { progress: number; text?: string }) => {
+    engineInstance = await CreateMLCEngine(modelId, undefined, {
+      initProgressCallback: (report: any) => {
         callbacks?.onProgress(report.progress * 100, report.text)
       },
     })
@@ -49,14 +38,7 @@ export async function loadModel(
 }
 
 export async function unloadModel(): Promise<void> {
-  if (engineInstance) {
-    try {
-      await engineInstance.unloadModel()
-    } catch {
-      // ignore unload errors
-    }
-    engineInstance = null
-  }
+  engineInstance = null
 }
 
 export interface StreamChunk {

@@ -19,11 +19,49 @@ interface ChatState {
 
 const generateId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
 
+// Demo session for first load
+const demoSession: ChatSession = {
+  id: 'demo-1',
+  title: 'Welcome to Rosee',
+  messages: [
+    {
+      id: 'demo-msg-1',
+      role: 'assistant',
+      content: "Hey! I'm **Rosee**, your AI assistant running entirely in your browser. No servers, no API keys — just local inference via WebGPU.\n\nTry asking me anything, or type `/commands` to see what's available.",
+      isStreaming: false,
+      timestamp: Date.now() - 60000,
+    },
+    {
+      id: 'demo-msg-2',
+      role: 'user',
+      content: 'What can you do?',
+      isStreaming: false,
+      timestamp: Date.now() - 30000,
+    },
+    {
+      id: 'demo-msg-3',
+      role: 'assistant',
+      content: "I can help with:\n\n- **Code generation** — Python, JS, TS, and more\n- **Explanations** — break down complex topics\n- **Creative writing** — stories, ideas, brainstorming\n- **File analysis** — attach images or text files\n- **Voice input** — click the mic and just talk\n\nAll running locally in your browser. What would you like to try?",
+      isStreaming: false,
+      timestamp: Date.now(),
+    },
+  ],
+  createdAt: Date.now() - 60000,
+  updatedAt: Date.now(),
+}
+
 // Load persisted state
 const persisted = loadState<{ sessions: ChatSession[]; activeSessionId: string | null }>('chat', {
   sessions: [],
   activeSessionId: null,
 })
+
+// Inject demo session on first load, then save
+if (persisted.sessions.length === 0) {
+  persisted.sessions = [demoSession]
+  persisted.activeSessionId = demoSession.id
+  saveState('chat', { sessions: persisted.sessions, activeSessionId: persisted.activeSessionId })
+}
 
 export const useChatStore = create<ChatState>((set, get) => ({
   sessions: persisted.sessions,

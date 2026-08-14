@@ -3,40 +3,38 @@ import type { ThemeName } from '../core/types'
 import { loadState, saveState } from '../utils/storage'
 
 interface UIState {
-  sidebarOpen: boolean
   theme: ThemeName
   activePanel: 'chat' | 'monitor' | 'settings'
+  isShattering: boolean
+  isAssembling: boolean
 
-  toggleSidebar: () => void
   setTheme: (theme: ThemeName) => void
   setActivePanel: (panel: 'chat' | 'monitor' | 'settings') => void
+  triggerShatter: () => void
+  triggerAssemble: () => void
+  resetState: () => void
 }
 
-const persisted = loadState<{ theme: ThemeName; sidebarOpen: boolean }>('ui', {
+const persisted = loadState<{ theme: ThemeName }>('ui', {
   theme: 'default',
-  sidebarOpen: true,
 })
 
 export const useUIStore = create<UIState>((set) => ({
-  sidebarOpen: persisted.sidebarOpen,
   theme: persisted.theme,
   activePanel: 'chat',
-
-  toggleSidebar: () =>
-    set(state => {
-      const next = { sidebarOpen: !state.sidebarOpen }
-      saveState('ui', { theme: state.theme, sidebarOpen: next.sidebarOpen })
-      return next
-    }),
+  isShattering: false,
+  isAssembling: false,
 
   setTheme: (theme) => {
     set({ theme })
-    saveState('ui', { theme, sidebarOpen: get().sidebarOpen })
+    saveState('ui', { theme })
   },
 
   setActivePanel: (activePanel) => set({ activePanel }),
-}))
 
-function get() {
-  return useUIStore.getState()
-}
+  triggerShatter: () => set({ isShattering: true, isAssembling: false }),
+
+  triggerAssemble: () => set({ isAssembling: true, isShattering: false }),
+
+  resetState: () => set({ isShattering: false, isAssembling: false }),
+}))

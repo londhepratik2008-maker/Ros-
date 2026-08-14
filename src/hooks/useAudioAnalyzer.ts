@@ -31,8 +31,8 @@ export function useAudioAnalyzer() {
   const analyze = useCallback(() => {
     if (!analyserRef.current) return
 
-    analyserRef.current.getByteFrequencyData(frequencyDataRef.current)
-    analyserRef.current.getByteTimeDomainData(waveformDataRef.current)
+    analyserRef.current.getByteFrequencyData(frequencyDataRef.current as Uint8Array<ArrayBuffer>)
+    analyserRef.current.getByteTimeDomainData(waveformDataRef.current as Uint8Array<ArrayBuffer>)
 
     const freq = frequencyDataRef.current
     const len = freq.length

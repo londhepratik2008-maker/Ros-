@@ -1,6 +1,6 @@
-import { useCallback, useState } from 'react'
+import { useCallback } from 'react'
 import { useDropzone } from 'react-dropzone'
-import { X, Image, FileText } from 'lucide-react'
+import { X, FileText } from 'lucide-react'
 
 export interface AttachedFile {
   id: string

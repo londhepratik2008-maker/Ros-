@@ -14,7 +14,7 @@ export function useLLM() {
 
     try {
       await loadModel(modelId, {
-        onProgress: (progress, text) => {
+        onProgress: (progress: number, _text?: string) => {
           setModelStatus({ progress, error: undefined })
         },
         onReady: () => {
