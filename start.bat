@@ -9,10 +9,36 @@ echo   Rosee - Local LLM Assistant Launcher
 echo  ========================================
 echo.
 
+REM --- Find Python ---
+set PYTHON=
+where python >nul 2>&1
+if %errorlevel% equ 0 (
+    set PYTHON=python
+    goto :found_python
+)
+where py >nul 2>&1
+if %errorlevel% equ 0 (
+    set PYTHON=py
+    goto :found_python
+)
+where python3 >nul 2>&1
+if %errorlevel% equ 0 (
+    set PYTHON=python3
+    goto :found_python
+)
+echo  [ERROR] Python not found. Install Python 3.10+ and add it to PATH.
+pause
+exit /b 1
+
+:found_python
+echo  Using: %PYTHON%
+%PYTHON% --version
+
+echo.
 echo  [1/5] Checking virtual environment...
 if not exist venv\Scripts\python.exe (
     echo  Creating virtual environment...
-    py -m venv venv
+    %PYTHON% -m venv venv
     if %errorlevel% neq 0 (
         echo  [ERROR] Failed to create venv
         pause
