@@ -10,7 +10,7 @@ interface ChatState {
   createSession: () => string
   setActiveSession: (id: string) => void
   addMessage: (sessionId: string, message: Message) => void
-  updateMessage: (sessionId: string, messageId: string, content: string) => void
+  updateMessage: (sessionId: string, messageId: string, content: string, persist?: boolean) => void
   finalizeMessage: (sessionId: string, messageId: string) => void
   deleteSession: (id: string) => void
   setStreaming: (streaming: boolean) => void
@@ -108,7 +108,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       return { sessions }
     }),
 
-  updateMessage: (sessionId, messageId, content) =>
+  updateMessage: (sessionId, messageId, content, persist = true) =>
     set(state => {
       const sessions = state.sessions.map(s =>
         s.id === sessionId
@@ -120,7 +120,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
             }
           : s
       )
-      saveState('chat', { sessions, activeSessionId: state.activeSessionId })
+      if (persist) {
+        saveState('chat', { sessions, activeSessionId: state.activeSessionId })
+      }
       return { sessions }
     }),
 

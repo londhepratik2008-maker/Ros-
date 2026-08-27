@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { ModelStatus, InferenceMetrics, GPUInfo } from '../core/types'
+import { DEFAULT_MODEL_ID } from '../core/models'
 
 interface ModelState {
   model: ModelStatus
@@ -15,7 +16,7 @@ export const useModelStore = create<ModelState>((set) => ({
   model: {
     state: 'idle',
     progress: 0,
-    modelName: 'Qwen2.5-7B-Instruct-q4f32_1',
+    modelName: DEFAULT_MODEL_ID,
   },
   gpu: { available: false },
   metrics: {

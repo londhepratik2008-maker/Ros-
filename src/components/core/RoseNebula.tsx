@@ -4,6 +4,7 @@ import { OrbitControls } from '@react-three/drei'
 import * as THREE from 'three'
 import type { AudioData } from '../../hooks/useAudioAnalyzer'
 import { useUIStore } from '../../store/uiStore'
+import { useChatStore } from '../../store/chatStore'
 
 interface NebulaContextData {
   audio: AudioData
@@ -49,7 +50,7 @@ const OrbitRing = ({
   const { audio, isShattering, isAssembling, shatterProgress, assembleProgress } = useContext(NebulaContext)
 
   const geometry = useMemo(() => {
-    return new THREE.TorusGeometry(radius, thickness, 16, 128)
+    return new THREE.TorusGeometry(radius, thickness, 16, 64)
   }, [radius, thickness])
 
   useFrame((state) => {
@@ -214,7 +215,8 @@ const OrbitalLayer = ({
 
 const ParticleSwarm = () => {
   const meshRef = useRef<THREE.InstancedMesh>(null!)
-  const count = 15000
+  // Reduced from 15k → 7k for ~2x GPU headroom during inference
+  const count = 7000
   const speedMult = 0.8
   const dummy = useMemo(() => new THREE.Object3D(), [])
   const target = useMemo(() => new THREE.Vector3(), [])
@@ -245,10 +247,8 @@ const ParticleSwarm = () => {
       const unitIndex = i / safeCount
       const hashA = Math.sin((i + 1.0) * 12.9898) * 43758.5453
       const hashB = Math.sin((i + 1.0) * 78.233) * 24634.6345
-      const hashC = Math.sin((i + 1.0) * 39.425) * 15731.7431
       const randA = hashA - Math.floor(hashA)
       const randB = hashB - Math.floor(hashB)
-      const randC = hashC - Math.floor(hashC)
       const signedA = randA * 2.0 - 1.0
       const signedB = randB * 2.0 - 1.0
 
@@ -330,9 +330,14 @@ const ParticleSwarm = () => {
   const smoothMid = useRef(0)
   const smoothTreble = useRef(0)
   const smoothVolume = useRef(0)
+  const frameCounter = useRef(0)
+  const isStreaming = useChatStore(s => s.isStreaming)
 
   useFrame((state) => {
     if (!meshRef.current) return
+    // Halve nebula FPS while the LLM streams — frees GPU for tokens
+    frameCounter.current += 1
+    if (isStreaming && frameCounter.current % 2 === 0) return
     const time = state.clock.getElapsedTime() * speedMult
 
     smoothBass.current += (audio.bass - smoothBass.current) * 0.15
@@ -382,29 +387,33 @@ const ParticleSwarm = () => {
       let hue = 0.93, saturation = 0.9, lightness = 0.5
 
       if (isShattering) {
+        // Compute from pristine original positions so repeated shatters never drift
         const shatterDir = shatterDirections[i]
         const shatterDist = shatterProgress * 120
         const shatterSpin = shatterProgress * Math.PI * 2 * (randA - 0.5)
+        const orig = originalPositions[i]
 
-        px = positions[i].x + shatterDir.x * shatterDist + Math.sin(shatterSpin) * 5
-        py = positions[i].y + shatterDir.y * shatterDist + Math.cos(shatterSpin) * 5
-        pz = positions[i].z + shatterDir.z * shatterDist
+        px = orig.x + shatterDir.x * shatterDist + Math.sin(shatterSpin) * 5
+        py = orig.y + shatterDir.y * shatterDist + Math.cos(shatterSpin) * 5
+        pz = orig.z + shatterDir.z * shatterDist
 
         hue = 0.95 - shatterProgress * 0.3 + signedC * 0.02
         saturation = 0.8 - shatterProgress * 0.4
         lightness = 0.4 + shatterProgress * 0.3
-
-        positions[i].x = px
-        positions[i].y = py
-        positions[i].z = pz
       } else if (isAssembling) {
         // Fly back to original position
         const orig = originalPositions[i]
         const eased = 1.0 - Math.pow(1.0 - assembleProgress, 3)
 
-        px = positions[i].x + (orig.x - positions[i].x) * eased * 0.2
-        py = positions[i].y + (orig.y - positions[i].y) * eased * 0.2
-        pz = positions[i].z + (orig.z - positions[i].z) * eased * 0.2
+        px = positions[i].x + (orig.x - positions[i].x) * eased * 0.45
+        py = positions[i].y + (orig.y - positions[i].y) * eased * 0.45
+        pz = positions[i].z + (orig.z - positions[i].z) * eased * 0.45
+
+        if (assembleProgress >= 0.999) {
+          px = orig.x
+          py = orig.y
+          pz = orig.z
+        }
 
         // Compute proper colors based on particle section
         if (unitIndex < 0.70) {
@@ -546,6 +555,15 @@ interface RoseNebulaProps {
   audioData?: AudioData
 }
 
+const DEFAULT_AUDIO: AudioData = {
+  frequency: new Uint8Array(64),
+  waveform: new Uint8Array(64),
+  bass: 0,
+  mid: 0,
+  treble: 0,
+  volume: 0,
+}
+
 export function RoseNebula({ audioData }: RoseNebulaProps) {
   const isShattering = useUIStore(s => s.isShattering)
   const isAssembling = useUIStore(s => s.isAssembling)
@@ -553,15 +571,6 @@ export function RoseNebula({ audioData }: RoseNebulaProps) {
   const [assembleProgress, setAssembleProgress] = useState(0)
   const shatterStart = useRef(0)
   const assembleStart = useRef(0)
-
-  const defaultAudio: AudioData = {
-    frequency: new Uint8Array(64),
-    waveform: new Uint8Array(64),
-    bass: 0,
-    mid: 0,
-    treble: 0,
-    volume: 0,
-  }
 
   useEffect(() => {
     if (isShattering) {
@@ -599,20 +608,30 @@ export function RoseNebula({ audioData }: RoseNebulaProps) {
   useEffect(() => {
     if (!isAssembling) return
     let raf: number
+    let resetTimer = 0
     const animate = () => {
       const elapsed = (performance.now() - assembleStart.current) / 1000
       const progress = Math.min(1.0, elapsed / 3.0)
       setAssembleProgress(progress)
       if (progress < 1.0) {
         raf = requestAnimationFrame(animate)
+      } else {
+        // Assembly complete — clear flag so idle animation resumes
+        resetTimer = window.setTimeout(() => {
+          const s = useUIStore.getState()
+          if (s.isAssembling) s.resetState()
+        }, 150)
       }
     }
     raf = requestAnimationFrame(animate)
-    return () => cancelAnimationFrame(raf)
+    return () => {
+      cancelAnimationFrame(raf)
+      window.clearTimeout(resetTimer)
+    }
   }, [isAssembling])
 
   const contextValue = useMemo(() => ({
-    audio: audioData || defaultAudio,
+    audio: audioData || DEFAULT_AUDIO,
     isShattering,
     isAssembling,
     shatterProgress,
@@ -631,9 +650,9 @@ export function RoseNebula({ audioData }: RoseNebulaProps) {
             <OrbitRing radius={38} speed={0.08} color="#d63384" thickness={0.15} opacity={0.25} tiltX={0.3} tiltZ={0.1} />
             <OrbitRing radius={42} speed={-0.05} color="#9c27b0" thickness={0.1} opacity={0.18} tiltX={0.5} tiltZ={-0.2} />
             <OrbitRing radius={48} speed={0.03} color="#e8527a" thickness={0.08} opacity={0.12} tiltX={0.8} tiltZ={0.4} />
-            <OrbitParticles radius={35} speed={0.12} count={200} color="#ff69b4" size={0.3} tiltX={0.25} tiltZ={0.05} />
-            <OrbitParticles radius={44} speed={-0.07} count={150} color="#c77dba" size={0.2} tiltX={0.6} tiltZ={-0.15} />
-            <OrbitParticles radius={52} speed={0.04} count={100} color="#dda0dd" size={0.15} tiltX={0.9} tiltZ={0.3} />
+            <OrbitParticles radius={35} speed={0.12} count={100} color="#ff69b4" size={0.3} tiltX={0.25} tiltZ={0.05} />
+            <OrbitParticles radius={44} speed={-0.07} count={80} color="#c77dba" size={0.2} tiltX={0.6} tiltZ={-0.15} />
+            <OrbitParticles radius={52} speed={0.04} count={60} color="#dda0dd" size={0.15} tiltX={0.9} tiltZ={0.3} />
           </NebulaGroup>
           <OrbitControls
             autoRotate

@@ -63,6 +63,9 @@ export function useAudioAnalyzer() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       const ctx = new AudioContext()
+      if (ctx.state === 'suspended') {
+        await ctx.resume()
+      }
       const analyser = ctx.createAnalyser()
       analyser.fftSize = 128
       analyser.smoothingTimeConstant = 0.8
@@ -89,7 +92,11 @@ export function useAudioAnalyzer() {
     cancelAnimationFrame(rafRef.current)
     sourceRef.current?.disconnect()
     streamRef.current?.getTracks().forEach(t => t.stop())
-    contextRef.current?.close()
+    void contextRef.current?.close().catch(() => {})
+    contextRef.current = null
+    analyserRef.current = null
+    sourceRef.current = null
+    streamRef.current = null
     setIsActive(false)
     setAudioData({
       frequency: new Uint8Array(64),
@@ -110,7 +117,7 @@ export function useAudioAnalyzer() {
     return () => {
       cancelAnimationFrame(rafRef.current)
       streamRef.current?.getTracks().forEach(t => t.stop())
-      contextRef.current?.close()
+      void contextRef.current?.close().catch(() => {})
     }
   }, [])
 

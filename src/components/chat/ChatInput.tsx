@@ -5,6 +5,8 @@ import { useUIStore } from '../../store/uiStore'
 import { useLLM } from '../../hooks/useLLM'
 import { useVoice } from '../../hooks/useVoice'
 import { FileUpload, type AttachedFile } from '../multimodal/FileUpload'
+import type { MessageAttachment } from '../../core/types'
+import { readFileText, isTextLikeFile } from '../../utils/file'
 import { Mic, MicOff, Paperclip, Send, Square, Plus, List, Trash2, ArrowRight } from 'lucide-react'
 
 interface Command {
@@ -26,17 +28,22 @@ export function ChatInput() {
   const triggerShatter = useUIStore(s => s.triggerShatter)
   const triggerAssemble = useUIStore(s => s.triggerAssemble)
 
+  // Ref mirror so voice callbacks never see stale state
+  const liveRef = useRef({ modelState: model.state, isStreaming, activeSessionId })
+  liveRef.current = { modelState: model.state, isStreaming, activeSessionId }
+
   const { isListening, isSupported, toggleListening } = useVoice({
     onResult: (transcript) => {
-      if (model.state === 'ready' && !isStreaming) {
+      const { modelState, isStreaming: streaming, activeSessionId: sessionId } = liveRef.current
+      if (modelState === 'ready' && !streaming) {
         send(transcript, model.modelName)
       } else {
         // Store voice message directly
-        let sessionId = activeSessionId
-        if (!sessionId) {
-          sessionId = createSession()
+        let sid = sessionId
+        if (!sid) {
+          sid = createSession()
         }
-        addMessage(sessionId, {
+        addMessage(sid, {
           id: `${Date.now()}-user`,
           role: 'user',
           content: transcript,
@@ -159,18 +166,22 @@ export function ChatInput() {
     return false
   }, [commands])
 
-  const handleSubmit = useCallback(() => {
+  const handleSubmit = useCallback(async () => {
     if (!input.trim() && files.length === 0) return
     if (isStreaming) return
 
-    // Handle commands
+    // Handle commands — give feedback when unknown instead of swallowing
     if (input.trim().startsWith('/')) {
-      handleCommand(input)
+      const handled = handleCommand(input)
+      if (!handled) {
+        showFeedback(`Unknown command: ${input.trim().split(/\s+/)[0]} — type /commands for help`)
+      }
       return
     }
 
-    // Detect "log off" — trigger shatter
-    if (input.trim().toLowerCase() === 'log off') {
+    // Detect "log off" — trigger shatter / "log in" — reassemble
+    const lowered = input.trim().toLowerCase()
+    if (lowered === 'log off' || lowered === 'log in') {
       let sessionId = activeSessionId
       if (!sessionId) {
         sessionId = createSession()
@@ -182,24 +193,8 @@ export function ChatInput() {
         timestamp: Date.now(),
       })
       setInput('')
-      triggerShatter()
-      return
-    }
-
-    // Detect "log in" — trigger assemble
-    if (input.trim().toLowerCase() === 'log in') {
-      let sessionId = activeSessionId
-      if (!sessionId) {
-        sessionId = createSession()
-      }
-      addMessage(sessionId, {
-        id: `${Date.now()}-user`,
-        role: 'user',
-        content: input.trim(),
-        timestamp: Date.now(),
-      })
-      setInput('')
-      triggerAssemble()
+      if (lowered === 'log off') triggerShatter()
+      else triggerAssemble()
       return
     }
 
@@ -208,17 +203,38 @@ export function ChatInput() {
       sessionId = createSession()
     }
 
-    const messageContent = input.trim() || `[${files.length} file(s) attached]`
+    // Build attachments from staged files
+    const attachments: MessageAttachment[] = files.map(f => ({
+      name: f.name,
+      type: f.type,
+      preview: f.preview,
+    }))
+
+    // Inject text file contents so the LLM can actually read them
+    let messageContent = input.trim() || `[${files.length} file(s) attached]`
+    if (model.state === 'ready' && files.length > 0) {
+      const textParts: string[] = []
+      for (const f of files) {
+        if (isTextLikeFile(f)) {
+          const content = await readFileText(f.file)
+          if (content !== null) textParts.push(`--- Attached file: ${f.name} ---\n${content}`)
+        }
+      }
+      if (textParts.length > 0) {
+        messageContent = `${messageContent}\n\n${textParts.join('\n\n')}`
+      }
+    }
 
     // If model is ready, send via LLM. Otherwise, just store the message.
     if (model.state === 'ready') {
-      send(messageContent, model.modelName)
+      send(messageContent, model.modelName, attachments)
     } else {
       addMessage(sessionId, {
         id: `${Date.now()}-user`,
         role: 'user',
-        content: messageContent,
+        content: input.trim() || `[${files.length} file(s) attached]`,
         timestamp: Date.now(),
+        attachments,
       })
     }
 
@@ -228,7 +244,7 @@ export function ChatInput() {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto'
     }
-  }, [input, files, isStreaming, activeSessionId, createSession, send, model, handleCommand, addMessage, triggerShatter, triggerAssemble])
+  }, [input, files, isStreaming, activeSessionId, createSession, send, model, handleCommand, addMessage, triggerShatter, triggerAssemble, showFeedback])
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -310,6 +326,7 @@ export function ChatInput() {
                 type: file.type,
                 size: file.size,
                 preview: file.type.startsWith('image/') ? URL.createObjectURL(file) : undefined,
+                file,
               }))
               setFiles(prev => [...prev, ...newFiles])
               e.target.value = ''
@@ -358,9 +375,16 @@ export function ChatInput() {
       </div>
 
       <div className="flex items-center justify-between mt-2 px-1">
-        <span className="text-[10px] font-mono text-hud-text-dim/50">
-          {modelReady ? 'Model ready' : 'Load model for AI responses'}
-        </span>
+        {modelReady ? (
+          <span className="text-[10px] font-mono text-hud-text-dim/50">Model ready</span>
+        ) : (
+          <button
+            onClick={() => useUIStore.getState().setActivePanel('settings')}
+            className="text-[10px] font-mono text-hud-accent hover:underline cursor-pointer"
+          >
+            Load model for AI responses →
+          </button>
+        )}
         <span className="text-[10px] font-mono text-hud-text-dim/50">
           {isStreaming ? (
             <span className="text-hud-accent animate-pulse">Generating...</span>

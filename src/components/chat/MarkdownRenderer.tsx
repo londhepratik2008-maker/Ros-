@@ -16,7 +16,7 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
       components={{
         code(props) {
           const { children, className, ...rest } = props
-          const match = /language-(\w+)/.exec(className || '')
+          const match = /language-([\w-]+)/.exec(className || '')
           const codeString = String(children).replace(/\n$/, '')
 
           if (match) {
@@ -90,10 +90,14 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
 function CodeBlock({ language, code }: { language: string; code: string }) {
   const [copied, setCopied] = useState(false)
 
-  const handleCopy = useCallback(() => {
-    navigator.clipboard.writeText(code)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+  const handleCopy = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(code)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // clipboard unavailable (insecure context) — no-op
+    }
   }, [code])
 
   return (

@@ -4,6 +4,11 @@ export interface MessageAttachment {
   preview?: string
 }
 
+export type ChatCompletionMessageParam = {
+  role: 'user' | 'assistant' | 'system'
+  content: string
+}
+
 export interface Message {
   id: string
   role: 'user' | 'assistant' | 'system'
@@ -26,6 +31,7 @@ export interface ModelStatus {
   state: 'idle' | 'loading' | 'ready' | 'error'
   progress: number
   downloadProgress?: number
+  progressText?: string
   error?: string
   modelName: string
 }

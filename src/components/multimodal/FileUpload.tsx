@@ -8,6 +8,7 @@ export interface AttachedFile {
   type: string
   preview?: string
   size: number
+  file: File
 }
 
 interface FileUploadProps {
@@ -23,6 +24,7 @@ export function FileUpload({ files, onFilesChange }: FileUploadProps) {
       type: file.type,
       size: file.size,
       preview: file.type.startsWith('image/') ? URL.createObjectURL(file) : undefined,
+      file,
     }))
     onFilesChange([...files, ...newFiles])
   }, [files, onFilesChange])
@@ -44,18 +46,12 @@ export function FileUpload({ files, onFilesChange }: FileUploadProps) {
     onFilesChange(files.filter(f => f.id !== id))
   }
 
-  if (files.length === 0 && !isDragActive) {
-    return null
-  }
-
   return (
-    <div className="space-y-2">
+    <div {...getRootProps()} className="relative">
+      <input {...getInputProps()} />
+
       {isDragActive && (
-        <div
-          {...getRootProps()}
-          className="border-2 border-dashed border-hud-accent rounded-lg p-6 text-center bg-hud-accent/5 cursor-pointer"
-        >
-          <input {...getInputProps()} />
+        <div className="border-2 border-dashed border-hud-accent rounded-lg p-6 text-center bg-hud-accent/5 cursor-pointer mb-2">
           <p className="text-sm text-hud-accent font-mono">Drop files here...</p>
         </div>
       )}
@@ -76,7 +72,10 @@ export function FileUpload({ files, onFilesChange }: FileUploadProps) {
               )}
               <span className="text-hud-text font-mono truncate max-w-[120px]">{file.name}</span>
               <button
-                onClick={() => removeFile(file.id)}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  removeFile(file.id)
+                }}
                 className="text-hud-text-dim hover:text-hud-danger transition-colors cursor-pointer"
               >
                 <X size={12} />
@@ -85,8 +84,6 @@ export function FileUpload({ files, onFilesChange }: FileUploadProps) {
           ))}
         </div>
       )}
-
-      {files.length === 0 && isDragActive && null}
     </div>
   )
 }

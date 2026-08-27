@@ -9,12 +9,25 @@ export async function detectWebGPU(): Promise<{ available: boolean; name?: strin
       return { available: false }
     }
 
-    const info = (adapter as any).requestAdapterInfo
-      ? await (adapter as any).requestAdapterInfo()
-      : { device: 'WebGPU', description: 'WebGPU Adapter' }
+    // Prefer the modern `adapter.info`, fall back to legacy requestAdapterInfo()
+    let name: string | undefined
+    const info = (adapter as any).info
+    if (info && (info.device || info.description || info.vendor)) {
+      name = [info.vendor, info.architecture, info.device, info.description]
+        .filter(Boolean)
+        .join(' ') || undefined
+    } else if (typeof (adapter as any).requestAdapterInfo === 'function') {
+      try {
+        const legacy = await (adapter as any).requestAdapterInfo()
+        name = legacy?.device || legacy?.description
+      } catch {
+        // ignore — keep undefined
+      }
+    }
+
     return {
       available: true,
-      name: info.device || info.description || 'WebGPU Adapter',
+      name: name || 'WebGPU Adapter',
     }
   } catch {
     return { available: false }

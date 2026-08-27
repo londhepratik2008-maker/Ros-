@@ -119,7 +119,7 @@ export function ChatPanel() {
 }
 
 function QuickPrompt({ text }: { text: string }) {
-  const { createSession, activeSessionId } = useChatStore()
+  const { createSession, activeSessionId, addMessage } = useChatStore()
   const { model } = useModelStore()
   const { send } = useLLM()
 
@@ -128,7 +128,17 @@ function QuickPrompt({ text }: { text: string }) {
     if (!sessionId) {
       sessionId = createSession()
     }
-    send(text, model.modelName)
+    if (model.state === 'ready') {
+      send(text, model.modelName)
+    } else {
+      // Offline — just store the message like ChatInput does
+      addMessage(sessionId, {
+        id: `${Date.now()}-user`,
+        role: 'user',
+        content: text,
+        timestamp: Date.now(),
+      })
+    }
   }
 
   return (
